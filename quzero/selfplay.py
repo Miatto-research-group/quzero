@@ -1,7 +1,6 @@
 import numpy as np
 import math
 import tensorflow as tf
-import ray
 from typing import Dict, List, Tuple, Optional
 from .helpers import (
     SharedStorage,
@@ -20,10 +19,9 @@ from .helpers import (
 # Each self-play job is independent of all others; it takes the latest network
 # snapshot, produces a game and makes it available to the training job by
 # writing it to a shared replay buffer.
-@ray.remote
 def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer):
   while True:
-    network = ray.get(storage.latest_network.remote())
+    network = storage.latest_network()
     game = play_game(config, network)
     print(game.action_history())
     replay_buffer.save_game.remote(game)

@@ -1,11 +1,9 @@
 from traceback_with_variables import activate_by_import
 from quzero import train, make_tictactoe_config
 import argparse
-import ray
 
 
 if __name__ == "__main__":
-    ray.init()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int)

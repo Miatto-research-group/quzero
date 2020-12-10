@@ -1,7 +1,6 @@
 from tqdm import trange
 import time
 import tensorflow as tf
-import ray
 from .helpers import SharedStorage, ReplayBuffer, MuZeroConfig, Network
 from .selfplay import run_selfplay
 
@@ -22,7 +21,7 @@ def train(config: MuZeroConfig):
     run_selfplay.remote(config, storage, replay_buffer)
   time.sleep(15)
   train_network(config, storage, replay_buffer)
-  return ray.get(storage.latest_network.remote())
+  return storage.latest_network()
 
 def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer):
   print('starting training')
@@ -33,9 +32,9 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
   for i in trange(config.training_steps):
     if i % config.checkpoint_interval == 0:
       storage.save_network.remote(i, network)
-    batch = ray.get(replay_buffer.sample_batch.remote(config.num_unroll_steps, config.td_steps))
+    batch = replay_buffer.sample_batch(config.num_unroll_steps, config.td_steps)
     update_weights(optimizer, network, batch, config.weight_decay)
-  storage.save_network.remote(config.training_steps, network)
+  storage.save_network(config.training_steps, network)
 
 
 def scale_gradient(tensor, scale):
