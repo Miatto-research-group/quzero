@@ -383,7 +383,6 @@ class Game(object):
         return ActionHistory(self.history, self.action_space_size)
 
 
-@ray.remote
 class ReplayBuffer(object):
     def __init__(self, config: MuZeroConfig):
         self.window_size = config.window_size
@@ -415,7 +414,6 @@ class ReplayBuffer(object):
         return randint(0, len(game.history) - 2)  # NOTE: -2? or -1?
 
 
-@ray.remote
 class SharedStorage(object):
     def __init__(self):
         self._networks = {}

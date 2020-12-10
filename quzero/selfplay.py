@@ -24,7 +24,7 @@ def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: Re
     network = storage.latest_network()
     game = play_game(config, network)
     print(game.action_history())
-    replay_buffer.save_game.remote(game)
+    replay_buffer.save_game(game)
 
 
 # Each game is produced by starting at the initial board position, then

@@ -13,12 +13,12 @@ from .selfplay import run_selfplay
 
 
 def train(config: MuZeroConfig):
-  storage = SharedStorage.remote()
-  replay_buffer = ReplayBuffer.remote(config)
+  storage = SharedStorage()
+  replay_buffer = ReplayBuffer(config)
 
   for i in range(config.num_actors):
     print(f'starting worker {i}')
-    run_selfplay.remote(config, storage, replay_buffer)
+    run_selfplay(config, storage, replay_buffer)
   time.sleep(15)
   train_network(config, storage, replay_buffer)
   return storage.latest_network()
@@ -31,7 +31,7 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
 
   for i in trange(config.training_steps):
     if i % config.checkpoint_interval == 0:
-      storage.save_network.remote(i, network)
+      storage.save_network(i, network)
     batch = replay_buffer.sample_batch(config.num_unroll_steps, config.td_steps)
     update_weights(optimizer, network, batch, config.weight_decay)
   storage.save_network(config.training_steps, network)
