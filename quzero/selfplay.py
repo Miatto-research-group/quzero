@@ -19,12 +19,17 @@ from .helpers import (
 # Each self-play job is independent of all others; it takes the latest network
 # snapshot, produces a game and makes it available to the training job by
 # writing it to a shared replay buffer.
-def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer):
-  while True:
+def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer, steps:int = None):
+  if steps == None:
+    steps = 1e9
+  i = 0
+  while i < steps:
+    i += 1
     network = storage.latest_network()
     game = play_game(config, network)
-    print(game.action_history())
+    print(f'{game}')
     replay_buffer.save_game(game)
+    
 
 
 # Each game is produced by starting at the initial board position, then
@@ -40,7 +45,6 @@ def play_game(config: MuZeroConfig, network: Network) -> Game:
     current_observation = game.make_image(-1)
     expand_node(root, game.to_play(), game.legal_actions(), network.initial_inference(current_observation))
     add_exploration_noise(config, root)
-  
     # We then run a Monte Carlo Tree Search using only action sequences and the
     # model learned by the network.
     run_mcts(config, root, game.action_history(), network)

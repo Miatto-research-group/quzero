@@ -1,43 +1,24 @@
-# import time
-import ray
-
-ray.init()
-
-
-# @ray.remote
-# class Buffer:
-#     def __init__(self):
-#         self._buffer = []
-
-#     def add(self, n):
-#         if len(self._buffer) > 5:
-#             self._buffer.pop(0)
-#         self._buffer.append(n)
-
-#     def show(self):
-#         return self._buffer
+from quzero import play_game, run_selfplay, make_tictactoe_config, Network, SharedStorage, ReplayBuffer
+import tensorflow as tf
+from tqdm import trange
+from quzero.training import update_weights
 
 
-# @ray.remote
-# def fill_buffer(buffer):
-#     while True:
-#         time.sleep(random.uniform(0, 1))
-#         buffer.add.remote(random.randint(0, 10))
+if __name__ == "__main__":
+  config = make_tictactoe_config(training_steps=1000)
 
+  network = Network()
+  storage = SharedStorage()
+  replay_buffer = ReplayBuffer(config)
 
-# @ray.remote
-# def process_func(buffer):
-#     for i in range(3):
-#         time.sleep(1)
-#         buff = ray.get(buffer.show.remote())
-#         print(buff)
-#     return "done"
+  for i in range(100):
+    run_selfplay(config, storage, replay_buffer, 20)
+    learning_rate = config.lr_init #* config.lr_decay_rate #** (tf.train.get_global_step() / config.lr_decay_steps)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum)
 
-
-# if __name__ == "__main__":
-#     num_workers = 2
-#     shared_buffer = Buffer.remote()
-#     fillers = [fill_buffer.remote(shared_buffer) for i in range(num_workers)]
-#     processor = process_func.remote(shared_buffer)
-#     result = ray.get(processor)
-#     print(result)
+    for i in trange(config.training_steps):
+        if i % config.checkpoint_interval == 0:
+            storage.save_network(i, network)
+        batch = replay_buffer.sample_batch(config.num_unroll_steps, config.td_steps)
+        update_weights(optimizer, network, batch, config.weight_decay)
+    storage.save_network(config.training_steps, network) 

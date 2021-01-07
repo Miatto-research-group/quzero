@@ -5,7 +5,6 @@ from random import randint
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-import ray
 
 MAXIMUM_FLOAT_VALUE = float("inf")
 
@@ -73,7 +72,7 @@ class MuZeroConfig:
         ### Training
         self.training_steps = int(training_steps)
         self.checkpoint_interval = int(1e3)
-        self.window_size = int(1e6)
+        self.window_size = int(1e2) # 1e2 'fresh' games 
         self.batch_size = batch_size
         self.num_unroll_steps = 5
         self.td_steps = td_steps
@@ -106,7 +105,7 @@ def make_tictactoe_config(training_steps) -> MuZeroConfig:
         batch_size=1,
         td_steps=9,  # max_moves
         num_actors=2,
-        lr_init=0.1,
+        lr_init=0.0001,
         lr_decay_steps=10e3,
         visit_softmax_temperature_fn=visit_softmax_temperature,
         known_bounds=None,
@@ -277,7 +276,7 @@ class Environment:
     y2 = slice(1, 9, 3)
     y3 = slice(2, 9, 3)
     d1 = slice(0, 9, 4)
-    d2 = slice(2, 9, 2)
+    d2 = slice(2, 7, 2)
     wins = [x1, x2, x3, y1, y2, y3, d1, d2]
 
     def __init__(self):
@@ -299,7 +298,7 @@ class Environment:
       return [Action(i) for i, b in enumerate(self.state) if b == 0]
 
     def isLegal(self, action: Action) -> bool:
-      return self.state[action] != 0
+      return self.state[action] == 0
 
     def step(self, action: Action):
       if self.isLegal(action):
@@ -382,8 +381,11 @@ class Game(object):
     def action_history(self) -> ActionHistory:
         return ActionHistory(self.history, self.action_space_size)
 
+    def __repr__(self):
+        return str(self.action_history()) + f' rew = {self.environment.reward()}'
 
-class ReplayBuffer(object):
+
+class ReplayBuffer:
     def __init__(self, config: MuZeroConfig):
         self.window_size = config.window_size
         self.batch_size = config.batch_size
@@ -412,6 +414,9 @@ class ReplayBuffer(object):
 
     def sample_position(self, game) -> int:
         return randint(0, len(game.history) - 2)  # NOTE: -2? or -1?
+
+    def __len__(self):
+      return len(self.buffer)
 
 
 class SharedStorage(object):
