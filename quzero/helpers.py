@@ -33,19 +33,21 @@ class MuZeroConfig:
     def __init__(
         self,
         action_space_size: int,
-        max_moves: int,
-        discount: float,
-        dirichlet_alpha: float,
-        num_simulations: int,
+        max_moves: int, #after this, you loose the game
+        discount: float, #for reward
+        dirichlet_alpha: float, #for exploration, controls how much you explore vs how much you exploit
+        num_simulations: int, #how many times you explore the tree
         batch_size: int,
-        td_steps: int,
-        num_actors: int,
+        td_steps: int, # == max_moves ???
+        num_actors: int, #parallel processes, 3k in google's paper
         lr_init: float,
         lr_decay_steps: float,
-        visit_softmax_temperature_fn,
+        visit_softmax_temperature_fn: float, #tuning how much we care about big values over small ones, raising result of MCTS to a certain power, do we keep small probabilities? do we give them importance? somehow a trust parameter on large probas...
         training_steps: int = 1e6,
         known_bounds: Optional[KnownBounds] = None,
     ):
+        # general main config for MuZero, no matter the game
+
         ### Self-Play
         self.action_space_size = action_space_size
         self.num_actors = num_actors
@@ -57,7 +59,7 @@ class MuZeroConfig:
 
         # Root prior exploration noise.
         self.root_dirichlet_alpha = dirichlet_alpha
-        self.root_exploration_fraction = 0.25
+        self.root_exploration_fraction = 0.25 #adding randomness to explo
 
         # UCB formula
         self.pb_c_base = 19652
@@ -71,14 +73,14 @@ class MuZeroConfig:
 
         ### Training
         self.training_steps = int(training_steps)
-        self.checkpoint_interval = int(1e3)
-        self.window_size = int(1e2) # 1e2 'fresh' games 
+        self.checkpoint_interval = int(1e3) #after how many games you save
+        self.window_size = int(1e2) # 1e2 'fresh' games how many past games we consider to learn on
         self.batch_size = batch_size
-        self.num_unroll_steps = 5
+        self.num_unroll_steps = 5 #look-ahead in future
         self.td_steps = td_steps
 
         self.weight_decay = 1e-4
-        self.momentum = 0.9
+        self.momentum = 0.9 #rms_prop
 
         # Exponential learning rate schedule
         self.lr_init = lr_init
@@ -90,11 +92,11 @@ class MuZeroConfig:
 
 
 def make_tictactoe_config(training_steps) -> MuZeroConfig:
-    def visit_softmax_temperature(num_moves, training_steps):
+    def visit_softmax_temperature(num_moves, training_steps): #interesting ???
         if num_moves < 5:
             return 1.0
         else:
-            return 0.0  # Play according to the max.
+            return 1.0  # Play according to the max. #??? change this?! random?!
 
     return MuZeroConfig(
         action_space_size=9,
@@ -106,7 +108,7 @@ def make_tictactoe_config(training_steps) -> MuZeroConfig:
         td_steps=9,  # max_moves
         num_actors=2,
         lr_init=0.0001,
-        lr_decay_steps=10e3,
+        lr_decay_steps=10e3, #tune according to game complexity, after how many steps you start decaying ???
         visit_softmax_temperature_fn=visit_softmax_temperature,
         known_bounds=None,
         training_steps=training_steps
@@ -137,7 +139,7 @@ class Player:  # TODO: this?
 class NetworkOutput(typing.NamedTuple):
     value: tf.Tensor
     reward: tf.Tensor
-    policy_logits: tf.Tensor
+    policy_logits: tf.Tensor #output of network,not yet a proba dist action / how likely it is to be the best action to take
     hidden_state: tf.Tensor
     #value: float
     #reward: float
@@ -149,7 +151,7 @@ class Network(object):
     def __init__(self):
         self.pol1 = layers.Dense(64, activation="relu", name="pol1")
         self.pol2 = layers.Dense(32, activation="relu", name="pol2")
-        self.pol3 = layers.Dense(9, activation="softmax", name="pol3")  # not logits?
+        self.pol3 = layers.Dense(9, activation="softmax", name="pol3")  # not logits???
         self.rew1 = layers.Dense(64, activation="relu", name="rew1")
         self.rew2 = layers.Dense(9, activation="relu", name="rew2")
         self.rew3 = layers.Dense(1, name="rew3")
@@ -158,10 +160,10 @@ class Network(object):
         self.val3 = layers.Dense(1, name="val3")
         self.dyn1 = layers.Dense(64, activation="relu", name="dyn1")
         self.dyn2 = layers.Dense(64, activation="relu", name="dyn2")
-        self.dyn3 = layers.Dense(64, name="dyn3")
-        self.repr1 = layers.Dense(9, activation="relu", name="repr1")
+        self.dyn3 = layers.Dense(64, name="dyn3") #updates inetrenal state representation
+        self.repr1 = layers.Dense(9, activation="relu", name="repr1") #9 = tictactoe board
         self.repr2 = layers.Dense(32, activation="relu", name="repr2")
-        self.repr3 = layers.Dense(64, name="repr3")
+        self.repr3 = layers.Dense(64, name="repr3") #expanding repr from 9 to 64, 64 will be input for others
         self.steps = 0
         self.layers = (
             self.pol1,
@@ -182,25 +184,29 @@ class Network(object):
         )
 
     def initial_inference(self, image) -> NetworkOutput:
+        """
+        Takes an observation from the env (board, unitary, screenshot, etc) and outputs a network output object
+        """
         hidden_state = self.repr3(self.repr2(self.repr1(tf.convert_to_tensor(image, dtype=tf.float32)[None, :])))
-        policy_logits = self.pol3(self.pol2(self.pol1(hidden_state)))
+        policy_logits = tf.math.log(self.pol3(self.pol2(self.pol1(hidden_state))) )  # logits after log
+        value = self.val3(self.val2(self.val1(hidden_state)))
+        return NetworkOutput(
+            tf.squeeze(value),
+            0, #rwd
+            tf.squeeze(policy_logits),
+            tf.squeeze(hidden_state),
+        )
+
+    #??? might have t change formulas for our unitary purpose!
+    def recurrent_inference(self, hidden_state, action: Action) -> NetworkOutput:
+        x = tf.concat([hidden_state, tf.one_hot(action.index, depth=9)], axis=0)[None,:] #input to dynamics, we pass state and action
+        hidden_state = self.dyn3(self.dyn2(self.dyn1(x)))
+        policy_logits = tf.math.log(self.pol3(self.pol2(self.pol1(hidden_state)))) # logits after log
         value = self.val3(self.val2(self.val1(hidden_state)))
         return NetworkOutput(
             tf.squeeze(value),
             0,
-            tf.squeeze(tf.math.log(policy_logits)), # logits after log
-            tf.squeeze(hidden_state),
-        )
-
-    def recurrent_inference(self, hidden_state, action: Action) -> NetworkOutput:
-        x = tf.concat([hidden_state, tf.one_hot(action.index, depth=9)], axis=0)[None,:]
-        hidden_state = self.dyn3(self.dyn2(self.dyn1(x)))
-        policy_logits = self.pol3(self.pol2(self.pol1(hidden_state)))
-        reward = self.rew3(self.rew2(self.rew1(hidden_state)))
-        return NetworkOutput(
-            0,
-            tf.squeeze(reward),
-            tf.squeeze(tf.math.log(policy_logits)), # logits after log
+            tf.squeeze(policy_logits),
             tf.squeeze(hidden_state),
         )
         # return NetworkOutput(

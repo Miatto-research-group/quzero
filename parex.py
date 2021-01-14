@@ -12,7 +12,7 @@ if __name__ == "__main__":
   replay_buffer = ReplayBuffer(config)
 
   for i in range(100):
-    run_selfplay(config, storage, replay_buffer, 20)
+    run_selfplay(config, storage, replay_buffer, 20) #plays 20 games
     learning_rate = config.lr_init #* config.lr_decay_rate #** (tf.train.get_global_step() / config.lr_decay_steps)
     optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum)
 
