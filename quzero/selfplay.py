@@ -50,7 +50,7 @@ def play_game(config: MuZeroConfig, network: Network) -> Game:
     run_mcts(config, root, game.action_history(), network)
     action = select_action(config, len(game.history), root, network)
     game.apply(action)
-    game.store_search_statistics(root)
+    game.store_search_statistics(root) #HELPERS
   return game
 
 

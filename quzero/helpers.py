@@ -229,20 +229,20 @@ class Network(object):
 class Node:
     def __init__(self, prior: float):
         self.visit_count = 0
-        self.to_play = -1
-        self.prior = prior
+        self.to_play = -1 #paper has it same but what is tit???
+        self.prior = prior #probability to pick that node from parent?
         self.value_sum = 0
         self.children: Dict[Action, Node] = {}
         self.hidden_state = None
-        self.reward = 0
+        self.reward = 0 #??? when is it updated? in self.play expand node
 
     def expanded(self) -> bool:
-        return bool(self.children)
+        return bool(self.children) #empty or not?
 
     def value(self) -> float:
         if self.visit_count == 0:
             return 0
-        return self.value_sum / self.visit_count
+        return self.value_sum / self.visit_count #??? I'm unclear abt this
 
 
 class ActionHistory:
@@ -270,20 +270,24 @@ class ActionHistory:
     def action_space(self) -> List[Action]:
         return [Action(i) for i in range(self.action_space_size)]
 
-    def to_play(self) -> Player:  # NOTE: what's this for?
+    def to_play(self) -> Player:  # NOTE: what's this for???
         return Player()
 
 
 class Environment:
+    #slicing state which is a list
+    #rows
     x1 = slice(0, 3)
     x2 = slice(3, 6)
     x3 = slice(6, 9)
-    y1 = slice(0, 9, 3)
+    #cols
+    y1 = slice(0, 9, 3) #0 to 8 in steps of 3
     y2 = slice(1, 9, 3)
     y3 = slice(2, 9, 3)
+    #diagonals
     d1 = slice(0, 9, 4)
     d2 = slice(2, 7, 2)
-    wins = [x1, x2, x3, y1, y2, y3, d1, d2]
+    wins = [x1, x2, x3, y1, y2, y3, d1, d2] #configs where you would have marked points
 
     def __init__(self):
       self.state_history = []
@@ -292,16 +296,16 @@ class Environment:
       self.save_state()
 
     def draw(self):
-      return self.reward() == 0 and all([b != 0 for b in self.state])
+      return self.reward() == 0 and all([b != 0 for b in self.state]) #no reward AND notExist b=0 in state, a.k.a all has been played
 
     def reward(self):
-      if any(sum(self.state[w]) == 3 for w in self.wins) or any(sum(self.state[w]) == -3 for w in self.wins):
-        return 1
+      if any(sum(self.state[w]) == 3 for w in self.wins) or any(sum(self.state[w]) == -3 for w in self.wins): #one player is 1 the other is -1
+        return 1 #do we retunr the same for both??? change?
       else:
         return 0
 
     def legal_actions(self) -> List[Action]:
-      return [Action(i) for i, b in enumerate(self.state) if b == 0]
+      return [Action(i) for i, b in enumerate(self.state) if b == 0] #b==0 value in the list
 
     def isLegal(self, action: Action) -> bool:
       return self.state[action] == 0
@@ -312,7 +316,7 @@ class Environment:
         self.turn *= -1
         self.save_state()
         return self.reward()
-      return -1
+      return -1 #punish if makes illegal action, but should never happen
 
     def save_state(self):
         self.state_history.append(list(self.state))
@@ -342,23 +346,31 @@ class Game(object):
         self.history.append(action)
 
     def store_search_statistics(self, root: Node):
-        sum_visits = sum(child.visit_count for child in root.children.values())
-        action_space = (Action(index) for index in range(self.action_space_size))
-        self.child_visits.append(
+        sum_visits = sum(child.visit_count for child in root.children.values()) #+1
+        action_space = (Action(index) for index in range(self.action_space_size)) #list of action objects
+        self.child_visits.append( #append a list to child_visits containing fraction of visits per children or 0  for a in action space if a in children then xxx else 0
             [root.children[a].visit_count / sum_visits if a in root.children else 0 for a in action_space]
         )
         self.root_values.append(root.value())
 
-    def make_image(self, state_index: int):
-        return self.environment.state_history[state_index]
+    def make_image(self, state_index: int): #obs of env
+        return self.environment.state_history[state_index] #state_history = list of states of the board, all saved in step
 
-    def make_target(self, state_index: int, num_unroll_steps: int, td_steps: int, to_play: Player):
+    def make_target(self, state_index: int, num_unroll_steps: int, td_steps: int, to_play: Player): #??? critical but given
         # The value target is the discounted root value of the search tree N steps
         # into the future, plus the discounted sum of all rewards until then.
+        """
+
+        :param state_index:
+        :param num_unroll_steps:
+        :param td_steps: =max_moves to use MC return, for board-games td_steps is max_moves, not for other games check this???
+        :param to_play:
+        :return:
+        """
         targets = []
         for current_index in range(state_index, state_index + num_unroll_steps + 1):
             bootstrap_index = current_index + td_steps
-            if bootstrap_index < len(self.root_values):
+            if bootstrap_index < len(self.root_values): #you never come here in board games
                 value = self.root_values[bootstrap_index] * self.discount ** td_steps
             else:
                 value = 0
@@ -369,7 +381,7 @@ class Game(object):
             # For simplicity the network always predicts the most recently received
             # reward, even for the initial representation network where we already
             # know this reward.
-            if current_index > 0 and current_index <= len(self.rewards):
+            if current_index > 0 and current_index <= len(self.rewards): #not first nor last move
                 last_reward = self.rewards[current_index - 1]
             else:
                 last_reward = 0
