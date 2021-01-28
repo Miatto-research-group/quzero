@@ -268,7 +268,7 @@ class Network(object):
 class Node:
     def __init__(self, prior: float):
         self.visit_count = 0
-        self.to_play = -1 #paper has it same but what is tit???
+        self.to_play = -1 #paper has it same but what is it???
         self.prior = prior #probability to pick that node from parent?
         self.value_sum = 0
         self.children: Dict[Action, Node] = {}
@@ -475,7 +475,7 @@ class Game(object):
             ???
 
          """
-        sum_visits = sum(child.visit_count for child in root.children.values()) #arent' we also summing +1s and -1s???
+        sum_visits = sum(child.visit_count for child in root.children.values())
         action_space = (Action(index) for index in range(self.action_space_size)) #list of action objects
 
         #list containing fraction of visits per children or 0  for a in action space if a in children then xxx else 0

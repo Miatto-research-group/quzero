@@ -28,6 +28,10 @@ def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: Re
     network = storage.latest_network()
     game = play_game(config, network)
     print(f'{game}')
+    #to check how weights evolve:
+    for l in network.layers:
+        for wb in l.get_weights():
+            print(np.linalg.norm(wb))
     replay_buffer.save_game(game)
     
 

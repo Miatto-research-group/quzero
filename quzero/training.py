@@ -57,6 +57,7 @@ def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, b
 
         hidden_state = scale_gradient(hidden_state, 0.5)
 
+      #potential bomb!!! comparing what tree says, what we say and we want them
       for prediction, target in zip(predictions, targets):
         gradient_scale, value, reward, policy_logits = prediction
         target_value, target_reward, target_policy = target
@@ -80,4 +81,5 @@ def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, b
 
 def scalar_loss(prediction, target) -> float:
     # MSE in board games, cross entropy between categorical values in Atari.
-    return 0.5 * (prediction - target) ** 2
+    #return 0.5 * (prediction - target) ** 2
+    return -1
