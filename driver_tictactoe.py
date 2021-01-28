@@ -5,9 +5,12 @@ from quzero.training import update_weights
 
 
 if __name__ == "__main__":
+
+    #in helpers, returns a MuZero congiguration object
   config = make_tictactoe_config(training_steps=1000)
 
-  network = Network()
+  network = Network() #a NN object def in helpers
+
   storage = SharedStorage()
   replay_buffer = ReplayBuffer(config)
 

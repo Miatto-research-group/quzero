@@ -54,29 +54,44 @@ def play_game(config: MuZeroConfig, network: Network) -> Game:
   return game
 
 
-# Core Monte Carlo Tree Search algorithm.
-# To decide on an action, we run N simulations, always starting at the root of
-# the search tree and traversing the tree according to the UCB formula until we
-# reach a leaf node.
-def run_mcts(config: MuZeroConfig, root: Node, action_history: ActionHistory, network: Network):
-  min_max_stats = MinMaxStats(config.known_bounds)
 
-  for _ in range(config.num_simulations):
-    history = action_history.clone()
-    node = root
-    search_path = [node]
+def run_mcts(config: MuZeroConfig, root: Node, action_history: ActionHistory, network: Network) -> None:
+    """
+    Core Monte Carlo Tree Search algorithm.
+    To decide on an action, we run N simulations, always starting at the root of
+    the search tree and traversing the tree according to the UCB formula until we
+    reach a leaf node.
 
-    while node.expanded():
-      action, node = select_child(config, node, min_max_stats)
-      history.add_action(action)
-      search_path.append(node)
+    Params
+    ----------
+    config : MuZeroConfig
+        the configuration of the MuZero agent
+    root : Node
+        ???
+    action_history : ActionHistory
+        ???
+    network : Network
+        ???
+
+    """
+    min_max_stats = MinMaxStats(config.known_bounds)
+
+    for _ in range(config.num_simulations):
+        history = action_history.clone()
+        node = root
+        search_path = [node]
+
+        while node.expanded():
+          action, node = select_child(config, node, min_max_stats)
+          history.add_action(action)
+          search_path.append(node)
 
     # Inside the search tree we use the dynamics function to obtain the next
     # hidden state given an action and the previous hidden state.
-    parent = search_path[-2]
-    network_output = network.recurrent_inference(parent.hidden_state, history.last_action())
-    expand_node(node, history.to_play(), history.action_space(), network_output)
-    backpropagate(search_path, network_output.value, history.to_play(), config.discount, min_max_stats)
+        parent = search_path[-2]
+        network_output = network.recurrent_inference(parent.hidden_state, history.last_action())
+        expand_node(node, history.to_play(), history.action_space(), network_output)
+        backpropagate(search_path, network_output.value, history.to_play(), config.discount, min_max_stats)
 
 
 def softmax_sample(visit_counts: List[Tuple[int, Action]], temperature: float) -> Action:

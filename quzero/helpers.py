@@ -1,16 +1,23 @@
+from __future__ import annotations #for returning current Type
 import typing
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, TypeVar, Union
 import collections
 from random import randint
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+import copy
 
 MAXIMUM_FLOAT_VALUE = float("inf")
 
 KnownBounds = collections.namedtuple("KnownBounds", ["min", "max"])
 
 
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class MinMaxStats:
     """A class that holds the min-max values of the tree."""
 
@@ -29,6 +36,11 @@ class MinMaxStats:
         return value
 
 
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class MuZeroConfig:
     def __init__(
         self,
@@ -115,6 +127,11 @@ def make_tictactoe_config(training_steps) -> MuZeroConfig:
     )
 
 
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class Action:
     def __init__(self, index: int):
         self.index = index
@@ -132,10 +149,20 @@ class Action:
         return self.index
 
 
-class Player:  # TODO: this?
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+class Player:  # TODO: this???
     pass
 
 
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class NetworkOutput(typing.NamedTuple):
     value: tf.Tensor
     reward: tf.Tensor
@@ -147,6 +174,12 @@ class NetworkOutput(typing.NamedTuple):
     #hidden_state: List[float]          #NOTE why a list?
 
 
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class Network(object):
     def __init__(self):
         self.pol1 = layers.Dense(64, activation="relu", name="pol1")
@@ -226,6 +259,12 @@ class Network(object):
         return self.steps
 
 
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class Node:
     def __init__(self, prior: float):
         self.visit_count = 0
@@ -245,23 +284,38 @@ class Node:
         return self.value_sum / self.visit_count #??? I'm unclear abt this
 
 
-class ActionHistory:
-    """Simple history container used inside the search.
 
-  Only used to keep track of the actions executed.
-  """
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+class ActionHistory:
+    """
+    Simple history container used inside the search.
+    Only used to keep track of the actions executed.
+
+    Attributes
+    ----------
+    history : list of lists of actions
+        Contains a list in which each item is a sequential list of actions taken / a trajectory / a game ???
+    action_space_size : int
+        The number of actions available.
+
+    """
 
     def __init__(self, history: List[Action], action_space_size: int):
         self.history = list(history)
         self.action_space_size = action_space_size
 
-    def __repr__(self):
+    def __repr__(self) -> str:
       return str([action.index for action in self.history])
 
-    def clone(self):
+    def clone(self) -> None:
         return ActionHistory(self.history, self.action_space_size)
+        #return ActionHistory(copy.deepcopy(self.history), self.action_space_size)
 
-    def add_action(self, action: Action):
+    def add_action(self, action: Action) -> None:
         self.history.append(action)
 
     def last_action(self) -> Action:
@@ -274,6 +328,12 @@ class ActionHistory:
         return Player()
 
 
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class Environment:
     #slicing state which is a list
     #rows
@@ -310,20 +370,49 @@ class Environment:
     def isLegal(self, action: Action) -> bool:
       return self.state[action] == 0
 
-    def step(self, action: Action):
+    def step(self, action: Action) -> int:
       if self.isLegal(action):
         self.state[action] = self.turn
         self.turn *= -1
         self.save_state()
         return self.reward()
-      return -1 #punish if makes illegal action, but should never happen
+      else:
+          raise RuntimeError("Agent tried to make an illegal move.")
+
 
     def save_state(self):
         self.state_history.append(list(self.state))
 
 
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class Game(object):
-    """A single episode of interaction with the environment."""
+    """
+    A class to represent a single episode of interaction with the environment.
+    Also referred to as "trajectory"
+
+    Attributes
+    ----------
+    environment : Environment object
+        The environment in which the game takes places.
+    history : list of actions
+        The sequential list of all actions taken during that particular episode of the game.
+    rewards : list of int
+        The sequential list of all actions taken during that particular episode of the game.
+    child_visits : lost of ???
+        ???
+    root_values : list of ???
+        ???
+    action_space_size : int
+        Number of possible actions?
+    discount : float
+        The discount factor (gamma) for TD learning
+    """
+
 
     def __init__(self, action_space_size: int, discount: float):
         self.environment = Environment()  # Game specific environment.
@@ -334,123 +423,354 @@ class Game(object):
         self.action_space_size = action_space_size
         self.discount = discount
 
+
     def terminal(self) -> bool:
+        """
+        Informs whether the state is terminal or not.
+
+        Returns
+        -------
+        bool
+            True if the reward is non-zero ???!!! or the game has ended in draw.
+        """
         return self.environment.reward() != 0 or self.environment.draw()
 
+
     def legal_actions(self) -> List[Action]:
+        """
+        Getter. Provides the list of actions which are feasible in this
+        environment.
+
+        Returns
+        -------
+        list of actions
+            The list of legal actions in this environment.
+        """
         return self.environment.legal_actions()
 
-    def apply(self, action: Action):
+
+    def apply(self, action: Action) -> None:
+        """
+        Performs an action with environment.step, which therefore grants a reward.
+         Both reward and action are added to their respective histories.
+
+        Parameters
+        ----------
+        action : Action
+            The action to be applied
+        """
         reward = self.environment.step(action)
         self.rewards.append(reward)
         self.history.append(action)
 
-    def store_search_statistics(self, root: Node):
-        sum_visits = sum(child.visit_count for child in root.children.values()) #+1
+
+    #wth???
+    def store_search_statistics(self, root: Node) -> None:
+        """
+        Keeps track of the number of times children were visited from their parent node???
+
+         Parameters
+         ----------
+         root : Node
+            ???
+
+         """
+        sum_visits = sum(child.visit_count for child in root.children.values()) #arent' we also summing +1s and -1s???
         action_space = (Action(index) for index in range(self.action_space_size)) #list of action objects
-        self.child_visits.append( #append a list to child_visits containing fraction of visits per children or 0  for a in action space if a in children then xxx else 0
-            [root.children[a].visit_count / sum_visits if a in root.children else 0 for a in action_space]
-        )
+
+        #list containing fraction of visits per children or 0  for a in action space if a in children then xxx else 0
+        new_list = [root.children[a].visit_count / sum_visits if a in root.children else 0 for a in action_space]
+        self.child_visits.append(new_list) #append a list to that list of lists
         self.root_values.append(root.value())
 
+
     def make_image(self, state_index: int): #obs of env
-        return self.environment.state_history[state_index] #state_history = list of states of the board, all saved in step
+        """
+        Returns the state_indexth board state from the state history.
+
+         Parameters
+         ----------
+         state_index : int
+            The index of the board's state we are interested in within state_history.
+
+         Returns
+         ----------
+        ???
+            The board state indexed by state_index.
+         """
+        return self.environment.state_history[state_index]
+
 
     def make_target(self, state_index: int, num_unroll_steps: int, td_steps: int, to_play: Player): #??? critical but given
-        # The value target is the discounted root value of the search tree N steps
-        # into the future, plus the discounted sum of all rewards until then.
         """
+        !!!Potential algorithmical error bomb!!!
+        ???
+        The value target is the discounted root value of the search tree N steps
+        into the future, plus the discounted sum of all rewards until then.
 
-        :param state_index:
-        :param num_unroll_steps:
-        :param td_steps: =max_moves to use MC return, for board-games td_steps is max_moves, not for other games check this???
-        :param to_play:
-        :return:
-        """
+
+         Parameters
+         ----------
+         state_index : int
+            ???
+         num_unroll_steps : int
+            Number of steps which must be unrolled/played into the future ???
+         td_steps : int
+            Number of TD learning steps to perform, maximal number of moves for
+             MC return. Note that for board games, td_steps=max_moves.
+         to_play : Player
+
+
+         Returns
+         ----------
+        ???
+            ???
+         """
+
         targets = []
+
         for current_index in range(state_index, state_index + num_unroll_steps + 1):
             bootstrap_index = current_index + td_steps
+
             if bootstrap_index < len(self.root_values): #you never come here in board games
-                value = self.root_values[bootstrap_index] * self.discount ** td_steps
+                value = self.root_values[bootstrap_index] * self.discount**td_steps
+
             else:
                 value = 0
 
             for i, reward in enumerate(self.rewards[current_index:bootstrap_index]):
-                value += reward * self.discount ** i  # pytype: disable=unsupported-operands
+                value += reward * self.discount**i  # pytype: disable=unsupported-operands
 
             # For simplicity the network always predicts the most recently received
             # reward, even for the initial representation network where we already
             # know this reward.
             if current_index > 0 and current_index <= len(self.rewards): #not first nor last move
                 last_reward = self.rewards[current_index - 1]
+
             else:
                 last_reward = 0
 
             if current_index < len(self.root_values):
                 targets.append((value, last_reward, self.child_visits[current_index]))
+
             else:
                 # States past the end of games are treated as absorbing states.
                 targets.append((0, last_reward, self.child_visits[-1]))#[])) #NOTE this was changed
+                #targets.append((0, last_reward, [])) #originally
+
         return targets
 
-    def to_play(self) -> Player:
+
+    def to_play(self) -> Player: #this should be something else!
+        """
+        ???
+
+        returns
+        ----------
+        Player
+            ???
+        """
         return Player()
 
+
     def action_history(self) -> ActionHistory:
+        """
+        ???
+
+        Returns
+        ----------
+        ActionHistory
+            ???
+        """
         return ActionHistory(self.history, self.action_space_size)
 
-    def __repr__(self):
+
+    def __repr__(self) -> str:
         return str(self.action_history()) + f' rew = {self.environment.reward()}'
 
 
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class ReplayBuffer:
+    """
+    A class representing a replay buffer where the trajectory data is stored
+    after the end of an episode. Trajectories are selected by sampling a state
+     from any game in this replay buffer, then unrolling from that state.
+    In board games the training job keeps an in-memory replay buffer of the
+    most recent 1 million games received; in Atari, where the visual
+    observations are larger, the most recent 125 thousand sequences of length
+    200 are kept.
+
+    Attributes
+    ----------
+    window_size : int
+        Maximum number of games/trajectories to be kept in the replay buffer.
+    batch_size : int
+        ???
+    buffer : list of games???trajectories???
+        Contains all the sample games/trajectories ??? which can be sampled
+        from.
+    """
+
+
     def __init__(self, config: MuZeroConfig):
+        """
+        Parameters
+        ----------
+        config : MuZeroConfig
+            The configuration of the MuZero agent.
+        """
         self.window_size = config.window_size
         self.batch_size = config.batch_size
         self.buffer = []
 
-    def save_game(self, game):
+
+    def save_game(self, game) -> None:
+        """
+        Saves the last game/trajectory played in the replay buffer's last index
+        while making sure there are never more than window-size
+        games/trajectories saved.
+
+        Parameters
+        ----------
+        game : ???
+            the game/trajectory to save.
+        """
         if len(self.buffer) > self.window_size:
             self.buffer.pop(0)
         self.buffer.append(game)
-        # print(f"replay buffer len={len(self.buffer)}")
+
 
     def sample_batch(self, num_unroll_steps: int, td_steps: int):
+        """
+        Saves the last game/trajectory played in the replay buffer's last index
+        while making sure there are never more than window-size
+        games/trajectories saved.
+
+        Parameters
+        ----------
+        game : ???
+            the game/trajectory to save.
+
+        Returns
+        -------
+        list of triplets
+            Each triplet containing:
+                - The state of the environment at that point in time
+                - A slice of the game history from the randomly chosen point
+                 in time to that point in time + the unrolled future.
+                - A triplet made of:
+                    - The TD value of the state
+                    - The latest reward received ???
+                    - A list of frequency visits per children of ???
+        """
+
+        #pick (at random) as many games from the buffer as dictated per batchsize
         games = [self.sample_game() for _ in range(self.batch_size)]
+
+        #tuples of game and a move/action index in that game
         game_pos = [(g, self.sample_position(g)) for g in games]
-        return [
-            (
-                g.make_image(i),
-                g.history[i : i + num_unroll_steps],
-                g.make_target(i, num_unroll_steps, td_steps, g.to_play()),
-            )
-            for (g, i) in game_pos
-        ]
+
+        result = [  (g.make_image(i), g.history[i : i + num_unroll_steps],
+                g.make_target(i, num_unroll_steps, td_steps, g.to_play()), )
+                   for (g, i) in game_pos ]
+        return result
+
 
     def sample_game(self) -> Game:
-        return self.buffer[randint(0, len(self.buffer) - 1)]  # random
+        """
+        Samples a game/trajectory ??? at random from the replay buffer.
 
+        Returns
+        -------
+        int
+            The random index.
+        """
+        rd_idx = randint(0, len(self.buffer) - 1) #why -1? ub is already excluded???
+        return self.buffer[rd_idx]
+
+
+    #wth does this do?!???
     def sample_position(self, game) -> int:
-        return randint(0, len(game.history) - 2)  # NOTE: -2? or -1?
+        """
+        Pick at random the index of an action in the game history (list of actions). ???
 
-    def __len__(self):
-      return len(self.buffer)
+        Returns
+        -------
+        int
+            The random index from the game history.
+        """
+        return randint(0, len(game.history) - 2)  # NOTE: -2? or -1? ???
 
 
+    def __len__(self) -> int:
+        """
+        Gives the length of the replay buffer.
+
+        Returns
+        -------
+        int
+            The length of the current buffer, a.k.a. the number of trajectories
+            which have been strored up to now.
+        """
+        return len(self.buffer)
+
+
+
+
+
+###############################################################################
+###############################################################################
+###############################################################################
 class SharedStorage(object):
+    """
+    A class used to represent a shared storage containing networks.
+
+     Attributes
+    ----------
+        _networks : dictionary of Network objects indexed by step count (int)
+        _networks[some_step] = some_Network
+    """
+
+
     def __init__(self):
         self._networks = {}
 
     def latest_network(self) -> Network:
+        """
+        Returns the network corresponding to the last one used,
+        or a new network object if there is no previous network
+
+        Returns
+        -------
+        Network
+            The most recent Network if there is one, or a newly created network.
+        """
         if self._networks:
             return self._networks[max(self._networks.keys())]
         else:
-            # policy -> uniform, value -> 0, reward -> 0
-            return Network()#make_uniform_network()
+            # policy -> uniform, value -> 0, reward -> 0 why does it return a new network???
+            return Network() #why don't we save that new network???
 
-    def save_network(self, step: int, network: Network):
+
+    def save_network(self, step: int, network: Network) -> None:
+        """
+        Saved the network in the SharedStorage object, indexing by the step as
+        key
+
+        Parameters
+        ----------
+        step : int
+            The training step the main algorithm is at ???
+        network : Network
+            The network to be added to the self storage
+
+        Returns
+        -------
+        None
+        """
         self._networks[step] = network
-
-
-def make_uniform_network():
-    return Network()
