@@ -13,8 +13,6 @@ from .selfplay import run_selfplay
 
 
 
-
-
 def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer) -> None:
   """
   Performs the training of the network.
