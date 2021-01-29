@@ -15,8 +15,7 @@ from .selfplay import run_selfplay
 
 def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer) -> None:
   """
-  Performs the training of the network.
-
+  Creates a new network object which is trained on available data for n training steps
   Parameters
   ----------
   config : MuZeroConfig
@@ -26,11 +25,11 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
   replay_buffer : ReplayBuffer
    The replay buffer of ???
   """
-  print('##### START TRAINING #####')
+  print('##### START TRAINING #####', flush=True)
   network = Network()
   #TODO fix the learning rate issue, here it doesn't change!
-  learning_rate = config.lr_init #* config.lr_decay_rate ** (tf.train.get_global_step() / config.lr_decay_steps)
-  optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum) #this is not deepmind' opti, why???
+  learning_rate = config.lr_init * config.lr_decay_rate #** (tf.train.get_global_step() / config.lr_decay_steps)
+  optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum) #DIFF the optimizer was changed due to version difference
 
   for i in trange(config.training_steps):
     if i % config.checkpoint_interval == 0:
@@ -41,13 +40,48 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
 
 
 
-def scale_gradient(tensor, scale):
-  """Scales the gradient for the backward pass."""
-  return tf.convert_to_tensor(tensor) * scale + tf.stop_gradient(tensor) * (1 - scale)
+def scale_gradient(tensor:tf.python.framework.ops.EagerTensor, scale:float) -> tf.python.framework.ops.EagerTensor:
+  """
+  Scales the gradient for the backward pass.
+
+  Parameters
+  ----------
+  tensor : tensorflow.python.framework.ops.EagerTensor
+    ???
+  scale : float
+
+  Returns
+  -------
+  tensorflow.python.framework.ops.EagerTensor
+    The scaled-down version of the input tensor ???
+  """
+  res = tensor * scale + tf.stop_gradient(tensor) * (1 - scale)
+  return res
 
 
 
 def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, batch, weight_decay: float):
+  """
+  Updates the weights of the network based on gradient optimisation.
+
+  Parameters
+  ----------
+  optimiser : tf.keras.optimizers.Optimizer
+    The optimiser to use for the weight updates task.
+  network : Network
+    The network on which to perform the weight updates.
+  batch :
+
+  weight_decay : float
+
+
+  Returns
+  -------
+  tensorflow.python.framework.ops.EagerTensor
+    The scaled-down version of the input tensor ???
+  """
+  print(type(network))
+  print(type(batch))
   loss = 0
   with tf.GradientTape() as tape:
     for image, actions, targets in batch:
@@ -81,11 +115,31 @@ def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, b
   grad = tape.gradient(loss, all_weights)
   optimizer.apply_gradients(zip(grad, all_weights))
   network.steps += 1
-  # if network.steps % 100 == 0:
-  #   print([action.index for action in actions])
 
 
 
 def scalar_loss(prediction, target) -> float:
-    # MSE in board games, cross entropy between categorical values in Atari.
-    return 0.5 * (prediction - target) ** 2
+  """
+  Definition of loss to be refined according to application, for instance
+   Deepmind advises MSE in board games, cross entropy between categorical
+   values in Atari.
+
+  Parameters
+  ----------
+  prediction : int
+    The value of ??? predicted by ???
+
+  target : int
+    The true value of ??? as given by ???
+
+  Returns
+  -------
+  float
+    A
+  """
+  #
+  print("PRED",type(prediction), flush=True)
+  print("TARt",type(target), flush=True)
+  res = 0.5 * (prediction - target) ** 2
+  print("RES",type(res), flush=True)
+  return  res

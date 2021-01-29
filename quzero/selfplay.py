@@ -19,20 +19,17 @@ from .helpers import (
 # Each self-play job is independent of all others; it takes the latest network
 # snapshot, produces a game and makes it available to the training job by
 # writing it to a shared replay buffer.
-def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer, steps:int = None):
-  if steps == None:
-    steps = 1e9
-  i = 0
-  while i < steps:
-    i += 1
+def run_selfplay(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer, steps:int = 1e9) -> None:
+  for _ in range(steps):
     network = storage.latest_network()
     game = play_game(config, network)
-    print(f'{game}')
-    #to check how weights evolve:
-    for l in network.layers:
-        for wb in l.get_weights():
-            print(np.linalg.norm(wb))
     replay_buffer.save_game(game)
+    print(f'{game}', flush=True)
+    #to check how weights evolve:
+    #for l in network.layers:
+    #    for wb in l.get_weights():
+    #        print(np.linalg.norm(wb))
+
     
 
 
@@ -106,6 +103,7 @@ def softmax_sample(visit_counts: List[Tuple[int, Action]], temperature: float) -
 
 
 def select_action(config: MuZeroConfig, num_moves: int, node: Node, network: Network):
+    #probably the problem ???
   visit_counts = [(child.visit_count, action) for action, child in node.children.items()]
   t = config.visit_softmax_temperature_fn(num_moves=num_moves, training_steps=network.training_steps())
   _, action = softmax_sample(visit_counts, t)

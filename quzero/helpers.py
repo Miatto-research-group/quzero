@@ -42,6 +42,12 @@ class MinMaxStats:
 ###############################################################################
 ###############################################################################
 class MuZeroConfig:
+    """
+    Parameters
+    ----------
+    training_steps : int
+        The number of times update_weights is called per call to train_network
+    """
     def __init__(
         self,
         action_space_size: int,
@@ -255,7 +261,13 @@ class Network(object):
             weights.extend(layer.weights)
         return weights
 
+    def update_nw_steps(selfself) -> None:
+        self.steps += 1
+
     def training_steps(self) -> int:
+        """
+        How many steps / batches the network has been trained for
+        """
         return self.steps
 
 
@@ -768,9 +780,5 @@ class SharedStorage(object):
             The training step the main algorithm is at ???
         network : Network
             The network to be added to the self storage
-
-        Returns
-        -------
-        None
         """
         self._networks[step] = network

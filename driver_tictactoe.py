@@ -7,7 +7,7 @@ from quzero.training import update_weights
 if __name__ == "__main__":
 
     #in helpers, returns a MuZero congiguration object
-    config = make_tictactoe_config(training_steps=1000)
+    config = make_tictactoe_config(training_steps=100)
     #####################################
     #network = Network() #a NN object def in helpers
     storage = SharedStorage()
@@ -15,5 +15,5 @@ if __name__ == "__main__":
 
 
     for _ in range(10): #for 10 epochs
-        run_selfplay(config, storage, replay_buffer, 20)  # plays 20 games
+        run_selfplay(config, storage, replay_buffer, 10)  # plays 20 games
         tr = train_network(config, storage, replay_buffer)
