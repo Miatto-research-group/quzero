@@ -12,22 +12,27 @@ from .selfplay import run_selfplay
 # to the training.
 
 
-def train(config: MuZeroConfig):
-  storage = SharedStorage()
-  replay_buffer = ReplayBuffer(config)
 
-  for i in range(config.num_actors):
-    print(f'starting worker {i}')
-    run_selfplay(config, storage, replay_buffer)
-  time.sleep(15)
-  train_network(config, storage, replay_buffer)
-  return storage.latest_network()
 
-def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer):
-  print('starting training')
+
+def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: ReplayBuffer) -> None:
+  """
+  Performs the training of the network.
+
+  Parameters
+  ----------
+  config : MuZeroConfig
+    The configuration of the MuZero agent.
+  storage : SharedStorage
+    A shared object containing networks.
+  replay_buffer : ReplayBuffer
+   The replay buffer of ???
+  """
+  print('##### START TRAINING #####')
   network = Network()
-  learning_rate = config.lr_init * config.lr_decay_rate #** (tf.train.get_global_step() / config.lr_decay_steps)
-  optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum)
+  #TODO fix the learning rate issue, here it doesn't change!
+  learning_rate = config.lr_init #* config.lr_decay_rate ** (tf.train.get_global_step() / config.lr_decay_steps)
+  optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum) #this is not deepmind' opti, why???
 
   for i in trange(config.training_steps):
     if i % config.checkpoint_interval == 0:
@@ -37,9 +42,11 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
   storage.save_network(config.training_steps, network)
 
 
+
 def scale_gradient(tensor, scale):
   """Scales the gradient for the backward pass."""
   return tf.convert_to_tensor(tensor) * scale + tf.stop_gradient(tensor) * (1 - scale)
+
 
 
 def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, batch, weight_decay: float):
@@ -79,7 +86,8 @@ def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, b
   # if network.steps % 100 == 0:
   #   print([action.index for action in actions])
 
+
+
 def scalar_loss(prediction, target) -> float:
     # MSE in board games, cross entropy between categorical values in Atari.
-    #return 0.5 * (prediction - target) ** 2
-    return -1
+    return 0.5 * (prediction - target) ** 2
