@@ -14,6 +14,6 @@ if __name__ == "__main__":
     replay_buffer = ReplayBuffer(config)
 
 
-    for _ in range(10): #for 10 epochs
-        run_selfplay(config, storage, replay_buffer, 10)  # plays 20 games
+    for _ in range(5): #for 10 epochs
+        run_selfplay(config, storage, replay_buffer, 3)  # plays 20 games
         tr = train_network(config, storage, replay_buffer)

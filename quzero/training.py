@@ -26,7 +26,7 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
    The replay buffer of ???
   """
   print('##### START TRAINING #####', flush=True)
-  network = Network()
+  network = Network() #why on earth do we create a new network everytime???
   #TODO fix the learning rate issue, here it doesn't change!
   learning_rate = config.lr_init * config.lr_decay_rate #** (tf.train.get_global_step() / config.lr_decay_steps)
   optimizer = tf.keras.optimizers.RMSprop(learning_rate, momentum=config.momentum) #DIFF the optimizer was changed due to version difference
@@ -37,6 +37,10 @@ def train_network(config: MuZeroConfig, storage: SharedStorage, replay_buffer: R
     batch = replay_buffer.sample_batch(config.num_unroll_steps, config.td_steps)
     update_weights(optimizer, network, batch, config.weight_decay)
   storage.save_network(config.training_steps, network)
+  print("NB NW IN STORAGE", len(storage._networks), flush=True)
+  #network.update_steps()
+
+
 
 
 
@@ -80,8 +84,8 @@ def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, b
   tensorflow.python.framework.ops.EagerTensor
     The scaled-down version of the input tensor ???
   """
-  print(type(network))
-  print(type(batch))
+  #print(type(network))
+  #print(type(batch))
   loss = 0
   with tf.GradientTape() as tape:
     for image, actions, targets in batch:
@@ -114,7 +118,8 @@ def update_weights(optimizer: tf.keras.optimizers.Optimizer, network: Network, b
   
   grad = tape.gradient(loss, all_weights)
   optimizer.apply_gradients(zip(grad, all_weights))
-  network.steps += 1
+  network.update_steps()
+  print(network.training_steps())
 
 
 
@@ -137,9 +142,8 @@ def scalar_loss(prediction, target) -> float:
   float
     A
   """
-  #
-  print("PRED",type(prediction), flush=True)
-  print("TARt",type(target), flush=True)
+  #print("PRED",type(prediction), flush=True)
+  #print("TARt",type(target), flush=True)
   res = 0.5 * (prediction - target) ** 2
-  print("RES",type(res), flush=True)
+  #print("RES",type(res), flush=True)
   return  res

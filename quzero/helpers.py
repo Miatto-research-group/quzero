@@ -242,9 +242,10 @@ class Network(object):
         hidden_state = self.dyn3(self.dyn2(self.dyn1(x)))
         policy_logits = tf.math.log(self.pol3(self.pol2(self.pol1(hidden_state)))) # logits after log
         value = self.val3(self.val2(self.val1(hidden_state)))
+        #what is the reward??? how do we compute it???
         return NetworkOutput(
             tf.squeeze(value),
-            0,
+            0, #wth, why fixed to 0???
             tf.squeeze(policy_logits),
             tf.squeeze(hidden_state),
         )
@@ -261,7 +262,7 @@ class Network(object):
             weights.extend(layer.weights)
         return weights
 
-    def update_nw_steps(selfself) -> None:
+    def update_steps(self) -> None:
         self.steps += 1
 
     def training_steps(self) -> int:
@@ -748,7 +749,6 @@ class SharedStorage(object):
         _networks[some_step] = some_Network
     """
 
-
     def __init__(self):
         self._networks = {}
 
@@ -760,7 +760,8 @@ class SharedStorage(object):
         Returns
         -------
         Network
-            The most recent Network if there is one, or a newly created network.
+            The network with more training steps if there is one, or a
+            newly created network.
         """
         if self._networks:
             return self._networks[max(self._networks.keys())]
